@@ -1,15 +1,13 @@
 # packages
 import os
-import jwt
 import json
 import time
-import hashlib
 import requests
 import numpy  as np
 import pandas as pd
 
 # project
-from helpers.authenticate import authenticate_service_account
+import helpers.authenticate as auth
 
 # API interface
 API_URL_BASE = os.environ.get('API_URL_BASE')
@@ -398,7 +396,6 @@ def synchronize_emulated_twin(event, labels, device_id, device_list, project_id,
         return ('no emulation label', 200), None
 
 
-
 def api_interface(event, labels, access_token):
     """
     Talk to API to calculate new model value.
@@ -454,17 +451,18 @@ def api_interface(event, labels, access_token):
     return ('OK', 200)
 
 
-def project_validate(request):
+def terminate(status, dt):
     """
-    Perform OAuth2 authentication flow for DT Authentication.
-    Uses service accounts for access control.
-    Uses JWT as the medium for the exchange.
-    https://support.disruptive-technologies.com/hc/en-us/articles/360011534099-Authentication
+    Called for terminating execution.
+    Prints some logging and returns.
 
     Parameters
     ----------
-    request : dictionary
-        HTTP POST request received.
+    status : tuple
+        Tuple with 2 cells containing status text [0] and status code [1].
+        Just passed to return.
+    dt : float
+        Seconds since function start.
 
     Returns
     -------
@@ -473,43 +471,15 @@ def project_validate(request):
 
     """
 
-    # check for signature environment variable
-    if DT_SIGNATURE_SECRET == None:
-        return ('missing secret', 400)
-
-    # check for dt header in request
-    if DT_SIGNATURE_HEADER not in request.headers:
-        return ('missing header', 400)
-
-    # verify secret against environment variable
-    token = request.headers[DT_SIGNATURE_HEADER]
-    try:
-        payload = jwt.decode(token, DT_SIGNATURE_SECRET, algorithms=["HS256"])
-    except:
-        return ('signature error', 400)
-
-    # verify body checksum
-    m = hashlib.sha1()
-    m.update(request.get_data())
-    checksum = m.digest().hex()
-
-    if payload["checksum"] != checksum:
-        return ('checksum mismatch', 400)
-
-    # success
-    return ('OK', 200)
-
-
-def terminate(status, dt):
+    # console out
     print('-- Execution ended at {:.3f}s with status {}.'.format(dt, status))
-
-    # logging frame end
     print('END' + '-'*50)
 
+    # pass status
     return status
 
 
-def dataconnector_endpoint(request):
+def main(request):
     """
     Point of contact with dataconnector.
     Validates the request and authenticates for API.
@@ -534,15 +504,15 @@ def dataconnector_endpoint(request):
     print('START' + '-'*50)
 
     # validate secret etc
-    status = project_validate(request)
+    status = auth.project_validate(request, DT_SIGNATURE_HEADER, DT_SIGNATURE_SECRET)
     if status[1] != 200:
         return terminate(status, time.time()-start)
 
     # authenticate to service account
-    access_token = authenticate_service_account(SERVICE_ACCOUNT_EMAIL,
-                                                SERVICE_ACCOUNT_KEY_ID,
-                                                SERVICE_ACCOUNT_SERCRET,
-                                                AUTH_ENDPOINT)
+    access_token = auth.authenticate_service_account(SERVICE_ACCOUNT_EMAIL,
+                                                     SERVICE_ACCOUNT_KEY_ID,
+                                                     SERVICE_ACCOUNT_SERCRET,
+                                                     AUTH_ENDPOINT)
     if access_token == None:
         return terminate(('Not Authenticated', 401), time.time()-start)
 
