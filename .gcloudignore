@@ -2,6 +2,7 @@
 .git
 .gitignore
 *.yaml
+.env.sh
 run_local.sh
 deploy.sh
 *__pycache__
