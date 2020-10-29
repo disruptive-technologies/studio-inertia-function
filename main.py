@@ -5,12 +5,11 @@ import json
 import time
 import hashlib
 import requests
-import logging
 import numpy  as np
 import pandas as pd
 
 # project
-from authenticate import authenticate_service_account
+from helpers.authenticate import authenticate_service_account
 
 # API interface
 API_URL_BASE = os.environ.get('API_URL_BASE')
@@ -19,7 +18,7 @@ AUTH_ENDPOINT = os.environ.get('AUTH_ENDPOINT')
 
 # studio labels
 EMULATION_LABEL       = 'inertia-model'
-TWIN_NAME_APPENDIX    = ' inertia'
+TWIN_NAME_APPENDIX    = ' twin'
 ORIGINAL_DEVICE_LABEL = 'original_device_id'
 
 # environment
@@ -112,7 +111,7 @@ def update_emulated_twin(event, twin, coefficient, project_id, access_token):
     if int(r.status_code) != 200:
         return ('ERROR: bad emit response', int(r.status_code))
 
-    logging.info('-- twin value emitted.')
+    print('-- Emitted new value to twin.')
     return ('OK', 200)
 
 
@@ -167,7 +166,7 @@ def find_twin(device_id, device_list):
 
         # check if device_id label exists and matches
         if 'original_device_id' in device['labels'].keys() and device['labels']['original_device_id'] == device_id:
-            logging.info('-- located twin: {}'.format(device['labels']['name']))
+            print('-- Located twin [{}].'.format(device['labels']['name']))
             return device
 
     # no twin found
@@ -213,9 +212,9 @@ def clean_twins(device_id, device_list, project_id, access_token):
 
             # verify deletion
             if r.status_code == 200:
-                logging.info('-- deleted twin: {}'.format(device['labels']['name']))
+                print('-- deleted twin: {}'.format(device['labels']['name']))
             else:
-                logging.info('WARNING: could not delete twin: {}'.format(device_id))
+                print('WARNING: could not delete twin: {}'.format(device_id))
 
 
 def spawn_twin(device_id, original_name, project_id, access_token):
@@ -254,7 +253,7 @@ def spawn_twin(device_id, original_name, project_id, access_token):
     r = requests.post(emulator_emit_url, headers={'Authorization': access_token}, data=payload)
 
     if r.status_code == 200:
-        logging.info('SPAWNED TWIN: {}'.format(twin_name))
+        print('-- Spawned twin [{}].'.format(twin_name))
 
     return r.status_code, r.json()
 
@@ -312,9 +311,9 @@ def refresh_twin_name(twin, new_prefix, project_id, access_token):
     payload = json.dumps({'value': new_prefix + TWIN_NAME_APPENDIX})
     r = requests.patch(emulator_emit_url, headers={'Authorization': access_token}, data=payload)
     if r.status_code == 200:
-        logging.info('TWIN NAME UPDATE: {} -> {}'.format(twin['labels']['name'], new_prefix + TWIN_NAME_APPENDIX))
+        print('-- Twin name refresh: {} -> {}.'.format(twin['labels']['name'], new_prefix + TWIN_NAME_APPENDIX))
     else:
-        logging.info('could not change name')
+        print('-- WARNING: Could not change name.')
 
 
 def synchronize_emulated_twin(event, labels, device_id, device_list, project_id, access_token):
@@ -341,49 +340,63 @@ def synchronize_emulated_twin(event, labels, device_id, device_list, project_id,
 
     """
 
-    # initialise output twin
+    # initialise some helper variables
     twin = None
+    new_spawn = False
 
-    event_type = event['eventType']
-    if EMULATION_LABEL in labels.keys() or (event_type == 'labelsChanged' and EMULATION_LABEL in event['data']['added'].keys()):
+    # check for labelsChanged event
+    if event['eventType'] == 'labelsChanged':
+        # new label
+        if EMULATION_LABEL in event['data']['added'].keys():
+            new_spawn = True
+            print('-- New emulation label.')
+
+        # modified label
+        elif EMULATION_LABEL in event['data']['modified'].keys():
+            return ('-- Modified emulation label.', 200), None
+
+        # removed label
+        elif EMULATION_LABEL in event['data']['removed']:
+            # remove any emulated devices associated with event source device
+            clean_twins(device_id, device_list, project_id, access_token)
+            return ('-- Removed emulation label.', 200), None
+
+    if EMULATION_LABEL in labels.keys() or new_spawn:
         # find twin if it exists
         twin = find_twin(device_id, device_list)
-
+    
         # locate original device in device_list
         original_device = find_original_device(device_id, device_list)
-
+    
         # verify that we found original device in device list
         if original_device == None: 
             return ('could not find original device', 400), None
-
+    
         # if it wasn't found (None), spawn it
         if twin == None:
             # cleanup existing twins
             clean_twins(device_id, device_list, project_id, access_token)
-
+    
             # spawn new twin
             spawn_status, twin = spawn_twin(device_id, get_device_name(original_device), project_id, access_token)
-
+    
             # verify good spawn
             if spawn_status != 200:
                 return ('ERROR: could not spawn twin', 400), None
-
+    
         # refresh twin name
         if twin != None:
             if not get_device_name(twin).startswith(get_device_name(original_device)):
                 refresh_twin_name(twin, get_device_name(original_device), project_id, access_token)
-
-    elif (event_type == 'labelsChanged' and EMULATION_LABEL in event['data']['modified'].keys()):
-        # do nothing
-        pass
+    
+        print('-- Synchronized with twin.')
+        return ('OK', 200), twin
+    
     else:
         # remove any emulated devices associated with event source device
         clean_twins(device_id, device_list, project_id, access_token)
-
         return ('no emulation label', 200), None
 
-    logging.info('-- synchronized with twin.')
-    return ('OK', 200), twin
 
 
 def api_interface(event, labels, access_token):
@@ -413,8 +426,8 @@ def api_interface(event, labels, access_token):
         return ('skipped event type {}'.format(event['eventType']), 200)
 
     # skip sensors with no emulation label
-    if EMULATION_LABEL not in labels.keys() and event['eventType'] != 'labelsChanged':
-        return ('no emulation', 200)
+    # if EMULATION_LABEL not in labels.keys() and event['eventType'] != 'labelsChanged':
+    #     return ('no emulation', 200)
 
     # request project devices list
     project_id       = event['targetName'].split('/')[1]
@@ -426,16 +439,12 @@ def api_interface(event, labels, access_token):
     status, twin = synchronize_emulated_twin(event, labels, device_id, device_list, project_id, access_token)
 
     # verify status
-    if status[1] != 200:
+    if status[1] != 200 or twin == None:
         return status
 
     # stop here if labelchange event
     if event['eventType'] == 'labelsChanged':
         return ('OK', 200)
-
-    # check None twin
-    if twin == None:
-        return ('missing twin', 400)
 
     # calculate model delta T
     status = update_emulated_twin(event, twin, labels[EMULATION_LABEL], project_id, access_token)
@@ -491,6 +500,15 @@ def project_validate(request):
     return ('OK', 200)
 
 
+def terminate(status, dt):
+    print('-- Execution ended at {:.3f}s with status {}.'.format(dt, status))
+
+    # logging frame end
+    print('END' + '-'*50)
+
+    return status
+
+
 def dataconnector_endpoint(request):
     """
     Point of contact with dataconnector.
@@ -512,11 +530,13 @@ def dataconnector_endpoint(request):
     # time the execution
     start = time.time()
 
+    # logging frame start
+    print('START' + '-'*50)
+
     # validate secret etc
     status = project_validate(request)
     if status[1] != 200:
-        logging.info(status)
-        return status
+        return terminate(status, time.time()-start)
 
     # authenticate to service account
     access_token = authenticate_service_account(SERVICE_ACCOUNT_EMAIL,
@@ -524,13 +544,11 @@ def dataconnector_endpoint(request):
                                                 SERVICE_ACCOUNT_SERCRET,
                                                 AUTH_ENDPOINT)
     if access_token == None:
-        logging.info(('bad auth', 401))
-        return ('bad auth', 401)
+        return terminate(('Not Authenticated', 401), time.time()-start)
 
     # talk to api
     status = api_interface(request.get_json()['event'], request.get_json()['labels'], access_token)
 
-    logging.info(status)
-    logging.info('python execution time: {}'.format(time.time()-start))
-    return status
+    # success
+    return terminate(status, time.time()-start)
 
