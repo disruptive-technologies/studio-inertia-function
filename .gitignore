@@ -1,3 +1,4 @@
-__pycache__/
+*__pycache__
 run_local.sh
-.env.yaml
+deploy.sh
+*.yaml
