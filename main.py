@@ -3,10 +3,9 @@ import os
 import json
 import time
 import requests
-import numpy  as np
-import pandas as pd
 
 # project
+import helpers.general      as gen
 import helpers.authenticate as auth
 
 # API interface
@@ -25,29 +24,6 @@ DT_SIGNATURE_SECRET     = os.environ.get("DT_SIGNATURE_SECRET")
 SERVICE_ACCOUNT_EMAIL   = os.environ.get('SERVICE_ACCOUNT_EMAIL')
 SERVICE_ACCOUNT_KEY_ID  = os.environ.get('SERVICE_ACCOUNT_KEY_ID')
 SERVICE_ACCOUNT_SERCRET = os.environ.get('SERVICE_ACCOUNT_SERCRET')
-
-
-def convert_event_data_timestamp(ts):
-    """
-    Convert the default event_data timestamp format to Pandas and unixtime format.
-
-    Parameters
-    ----------
-    ts : str
-        UTC timestamp in custom API event data format.
-
-    Returns
-    -------
-    timestamp : datetime
-        Pandas Timestamp object format.
-    unixtime : int
-        Integer number of seconds since 1 January 1970.
-    """
-
-    timestamp = pd.to_datetime(ts)
-    unixtime  = pd.to_datetime(np.array([ts])).astype(int)[0] // 10**9
-
-    return timestamp, unixtime
 
 
 def update_emulated_twin(event, twin, coefficient, project_id, access_token):
@@ -89,8 +65,8 @@ def update_emulated_twin(event, twin, coefficient, project_id, access_token):
         previous_model_temperature = twin['reported']['temperature']['value']
 
         # get time since last event
-        _, previous_model_ux = convert_event_data_timestamp(twin['reported']['temperature']['updateTime'])
-        _, event_ux          = convert_event_data_timestamp(event['data']['temperature']['updateTime'])
+        _, previous_model_ux = gen.convert_event_data_timestamp(twin['reported']['temperature']['updateTime'])
+        _, event_ux          = gen.convert_event_data_timestamp(event['data']['temperature']['updateTime'])
 
         # normalise by the minute
         normaliser = (event_ux - previous_model_ux) / (60)
