@@ -1,0 +1,15 @@
+.gcloudignore
+.git
+.gitignore
+*.yaml
+*.yml
+*_test.py
+Makefile
+run_local.sh
+deploy.sh
+deploy_dev.sh
+*__pycache__
+requirements_dev.txt
+notes.md
+.env.sh
+helpers/
