@@ -1,7 +1,7 @@
 # Studio Inertia Application Note
 
 ## What am I?
-This repository contains the Python cloud function for receiving, authenticating and modeling temperature data from a DT Studio Data Connector. It has been written to work as a Google Cloud Function, but can with minor editing work on any of the major cloud hosting services. It is developed to serve as an example implementation on how to perform custom data manipulation in DT Studio, explained in [this application note](https://www.disruptive-technologies.com/).
+This repository contains the Python cloud function for receiving, authenticating and modeling temperature data from a DT Studio Data Connector. It has been written to work as a Google Cloud Function, but can with minor editing work on any of the major cloud hosting services. It is developed to serve as an example implementation on how to perform custom data manipulation in DT Studio, explained in [this application note](https://support.disruptive-technologies.com/hc/en-us/articles/360017283539).
 
 ## Before You Deploy
 Environment variables must be set. For this, create a *.env.yaml* file with the following content.
