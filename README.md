@@ -27,7 +27,8 @@ gcloud functions deploy YOUR_FUNCTION_NAME \
     --timeout 30s \
     --ignore-file .gcloudignore \
     --project YOUR_GCLOUD_PROJECT \
-    --region YOUR_REGION
+    --region YOUR_REGION \
+    --env-vars-file .env.yaml
 ```
 
 ## Local Development
