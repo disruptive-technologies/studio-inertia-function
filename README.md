@@ -1,10 +1,9 @@
-# Studio Inertia Application Note
-
+# Studio Inertia Function
 ## What am I?
-This repository contains the Python cloud function for receiving, authenticating and modeling temperature data from a DT Studio Data Connector. It has been written to work as a Google Cloud Function, but can with minor editing work on any of the major cloud hosting services. It is developed to serve as an example implementation on how to perform custom data manipulation in DT Studio, explained in [this application note](https://www.disruptive-technologies.com/).
+This repository contains the Python cloud function for receiving, authenticating and modeling temperature data from a DT Studio Data Connector. It has been written to work as a Google Cloud Function service, but can with minor editing work on any of the major cloud hosting services. It is developed to serve as an example implementation on how to perform custom data manipulation in DT Studio, explained in [this application note](https://www.disruptive-technologies.com/).
 
 ## Before You Deploy
-Environment variables must be set. For this, create a *.env.yaml* file with the following content.
+Environment variables must be set when deploying the function. For this, create an *.env.yaml* file with the following content.
 ```yaml
 SERVICE_ACCOUNT_KEY_ID: ___
 SERVICE_ACCOUNT_SERCRET: ___
@@ -14,7 +13,7 @@ AUTH_ENDPOINT: https://identity.disruptive-technologies.com/oauth2/token
 API_URL_BASE: https://api.disruptive-technologies.com/v2
 EMU_URL_BASE: https://emulator.disruptive-technologies.com/v2
 ```
-The service account key, secret, and email are those create by a DT Studio Service account. This is used for authentication when interfacing with the API. The signature secret should be a strong and unique password, also used when creating a new Data Connector.
+The service account key, secret, and email are the same as those created by a DT Studio Service account. This is used for authentication when interfacing with the API. The signature secret should be a strong and unique password, also used when creating a new Data Connector.
 
 ## Deploy
 Deployment is easiest through the use of the Google Cloud CLI. After changing the capitalized arguments below, a single call is enough to push a new verison of the function.
